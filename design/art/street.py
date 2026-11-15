@@ -318,7 +318,7 @@ def dart():
         "class LightPlace {",
         "  const LightPlace({required this.art, required this.tap, this.animal, this.pane});",
         "",
-        "  /// assets/art/street/glow_<light>.svg.",
+        "  /// `assets/art/street/glow_<light>.svg`.",
         "  final Rect art;",
         "",
         "  /// Where a finger turns it off.",

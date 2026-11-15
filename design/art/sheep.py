@@ -1,6 +1,7 @@
 """Counting sheep (數羊): a night meadow with a little fence, and a fluffy moonlit sheep.
 
-    sheep/meadow.svg       400 x 260  the hills and the fence (the fence's top is at FENCE_TOP)
+    sheep/meadow.svg       600 x 260  the hills and the fence (the fence's top is at FENCE_TOP), wide enough for
+                                      tablets; phones show the middle
     sheep/sheep.svg        100 x 80   a sheep mid-hop (legs tucked)
     sheep/sheep_sleep.svg  100 x 80   a sheep lying down asleep
 """
@@ -11,13 +12,14 @@ sys.dont_write_bytecode = True
 import kit  # noqa: E402
 from kit import INK, SHEEP, SHEEP_DK, ellipse, rect, rrect, smooth  # noqa: E402
 
-FENCE_X, FENCE_TOP, FENCE_W = 160, 150, 80
+FENCE_X, FENCE_TOP, FENCE_W = 260, 150, 80
+MW = 600
 
 
 def meadow():
-    s = kit.Svg(400, 260)
-    s.path(smooth([(0, 150), (90, 128), (200, 140), (300, 120), (400, 136)], close=False) + " L400 260 L0 260 Z", "#202A5C")
-    s.path(smooth([(0, 196), (110, 178), (230, 186), (330, 172), (400, 180)], close=False) + " L400 260 L0 260 Z", "#171E48")
+    s = kit.Svg(MW, 260)
+    s.path(smooth([(0, 140), (100, 132), (190, 128), (300, 140), (400, 120), (500, 136), (600, 126)], close=False) + " L600 260 L0 260 Z", "#202A5C")
+    s.path(smooth([(0, 186), (100, 182), (210, 178), (330, 186), (430, 172), (520, 182), (600, 176)], close=False) + " L600 260 L0 260 Z", "#171E48")
     # the fence: posts and two rails
     post = "#2B336A"
     for i in range(5):
@@ -27,8 +29,8 @@ def meadow():
     s.path(rrect(FENCE_X - 8, FENCE_TOP + 28, FENCE_W + 16, 6, 3), post)
     # tufts of grass and a few flowers closed for the night
     r = kit.rnd("grass")
-    for i in range(16):
-        x, y = r.uniform(5, 395), r.uniform(205, 250)
+    for i in range(24):
+        x, y = r.uniform(5, 595), r.uniform(205, 250)
         s.path(f"M{kit.n(x - 5)} {kit.n(y)} Q{kit.n(x - 3)} {kit.n(y - 9)} {kit.n(x - 1)} {kit.n(y - 12)} Q{kit.n(x)} {kit.n(y - 5)} {kit.n(x + 1)} {kit.n(y - 12)} "
                f"Q{kit.n(x + 3)} {kit.n(y - 8)} {kit.n(x + 5)} {kit.n(y)} Z", "#25306A")
     return s.text()

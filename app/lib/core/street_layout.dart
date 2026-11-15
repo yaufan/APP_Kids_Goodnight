@@ -35,8 +35,8 @@ const lightPlaces = <Light, LightPlace>{
   Light.owl: LightPlace(art: Rect.fromLTWH(444, 206, 88, 94), tap: Rect.fromLTWH(465, 227, 46, 52), animal: Rect.fromLTWH(470, 232, 36, 42), pane: Rect.fromLTWH(470, 232, 36, 42)),
   Light.dog: LightPlace(art: Rect.fromLTWH(264, 376, 106, 88), tap: Rect.fromLTWH(284, 396, 66, 48), animal: Rect.fromLTWH(300, 401, 34, 41)),
   Light.window: LightPlace(art: Rect.fromLTWH(320, 184, 88, 94), tap: Rect.fromLTWH(341, 205, 46, 52), pane: Rect.fromLTWH(346, 210, 36, 42)),
-  Light.door: LightPlace(art: Rect.fromLTWH(336, 376, 68, 92), tap: Rect.fromLTWH(352, 390, 36, 58)),
-  Light.lantern: LightPlace(art: Rect.fromLTWH(408, 382, 64, 70), tap: Rect.fromLTWH(420, 394, 40, 44)),
-  Light.sign: LightPlace(art: Rect.fromLTWH(452, 356, 102, 52), tap: Rect.fromLTWH(466, 366, 74, 30)),
+  Light.door: LightPlace(art: Rect.fromLTWH(336, 376, 68, 92), tap: Rect.fromLTWH(351, 390, 42, 58)),
+  Light.lantern: LightPlace(art: Rect.fromLTWH(408, 382, 64, 70), tap: Rect.fromLTWH(418, 394, 44, 44)),
+  Light.sign: LightPlace(art: Rect.fromLTWH(452, 356, 102, 52), tap: Rect.fromLTWH(466, 360, 74, 42)),
   Light.lamp: LightPlace(art: Rect.fromLTWH(192, 336, 74, 112), tap: Rect.fromLTWH(200, 336, 52, 46)),
 };

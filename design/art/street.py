@@ -286,11 +286,11 @@ def layout():
     sx, sy, sw, sh = SHOP
     out["dog"] = (glow_box(*SHOP, 24), (sx - 4, sy - 4, sw + 8, sh + 8), (sx + sw / 2 - 17, sy + 1, 34, 41), None)
     dx, dy, dw, dh = DOOR
-    out["door"] = (glow_box(*DOOR, 20), (dx - 4, dy - 6, dw + 8, dh + 6), None, None)
+    out["door"] = (glow_box(*DOOR, 20), (dx - 5, dy - 6, dw + 14, dh + 6), None, None)
     lx, ly, lw, lh = LANTERN_AT
-    out["lantern"] = (glow_box(*LANTERN_AT, 22), (lx - 10, ly - 10, lw + 20, lh + 18), None, None)
+    out["lantern"] = (glow_box(*LANTERN_AT, 22), (lx - 12, ly - 10, lw + 24, lh + 18), None, None)
     gx, gy, gw, gh = SIGN
-    out["sign"] = (glow_box(*SIGN, 18), (gx - 4, gy - 8, gw + 8, gh + 14), None, None)
+    out["sign"] = (glow_box(*SIGN, 18), (gx - 4, gy - 14, gw + 8, gh + 26), None, None)
     hx, hy, hw, hh = LAMP_HEAD
     out["lamp"] = (LAMP_ART, (hx - 14, hy - 16, hw + 22, 46), None, None)
     return out

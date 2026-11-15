@@ -73,7 +73,7 @@ enum Animal {
 
   final String zh;
 
-  /// Its own yawn (design/sounds: yawn_<animal>).
+  /// Its own yawn (design/sounds: `yawn_<animal>`).
   String get yawn => 'yawn_$name';
 }
 

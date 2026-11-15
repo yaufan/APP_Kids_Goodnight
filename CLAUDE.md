@@ -41,21 +41,11 @@
 
   規則和畫畫小鎮的 `CLAUDE.md` 一樣；那個帳號每月 2,000 分鐘是所有私有專案共用的，Mac 主機的 1 分鐘算 10 分鐘。
 
-## GitHub Actions
-- 工作流程（照迷宮小冒險，2026-11-08 加好；第一次放上 main 前要先問）：
-  - `app.yml`（App）：推到 `main` 而且改到 `app/**` 時跑分析、全部測試（含完整流程）、打包 APK，約 15～20 分鐘。
-  - `release.yml`（Release）：推到 `main` 而且改到 `app/pubspec.yaml`、`CHANGELOG.md` 或它自己時，版本還沒發布過就打包三個 APK 放上 Releases，約 20 分鐘；版本沒變約 1 分鐘。
-  - `cleanup.yml`：手動，刪舊的建置檔案，約 1 分鐘。
-- 推工作分支（`claude/...`）不會啟動任何工作流程。
-- 簽章：和畫畫小鎮用**同一把測試金鑰**（別名 `kidspaint`），Secrets 名稱一樣：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`，要放在這個專案的 Actions → Secrets → Repository secrets。指紋 `TEST_KEY_SHA256` 寫在工作流程裡。以後上架要換成正式的上傳金鑰。
-- 發新版本：`app/pubspec.yaml` 的 `version`、`app/lib/app/version.dart` 的預設值、`CHANGELOG.md` 最上面一段（`## 版本 …`）三個要一致（`test/version_test.dart` 檢查）。
-- **任何會啟動 Actions 的動作，都要先問使用者，等使用者同意才做**，問的時候說清楚四件事：
-  1. 會跑哪些工作流程。
-  2. 這次大約用掉幾分鐘。
-  3. 這個月目前用了多少。
-  4. 跑完大約還剩多少。
-
-  規則和畫畫小鎮的 `CLAUDE.md` 一樣；那個帳號每月 2,000 分鐘是所有私有專案共用的，Mac 主機的 1 分鐘算 10 分鐘。
+## Git
+- **發布新版本、做成可以安裝的 APK、給下載 QR code**：照 skill `release-kids-app`（`.claude/skills/release-kids-app/SKILL.md`），兄弟 APP 共用同一份。
+- 在系統指定的 `claude/...` 工作分支上開發，commit 完就推這個分支。
+- commit 訊息用英文寫清楚改了什麼和為什麼，結尾加系統要求的署名行。不要寫模型名稱。
+- 不能 commit：金鑰、密碼、不公開的文件、`__pycache__`。
 
 ## 和畫畫小鎮共用的做法（開始寫程式時照著做）
 - Flutter 3.47.8、Riverpod、flutter_svg、audioplayers、flutter_tts。存檔是一個 JSON 檔（`app/lib/core/store.dart`），沒有用 drift，所以本機跑測試**不用** sqlite 那段，直接 `flutter test`。
@@ -65,6 +55,14 @@
 - 完整流程和截圖：`flutter test test/flow_test.dart`，截圖在 `app/build/screenshots/`。
 - 示範影片（每一版都要給使用者）：在 `app/` 裡 `flutter test test/demo/demo_video_test.dart --dart-define=DEMO=true`（約 5～10 分鐘，要 ffmpeg），再在專案根目錄 `python3 tools/demo_audio.py` 把背景音樂和音效混進去。輸出 `app/build/demo/demo.mp4`；`chapters.txt` 是每一段開始的格數（每秒 10 格），用來剪新功能的片段。
 
+## 程式在哪裡
+- `app/lib/core/`：內容的名字（`content.dart`：段落、晚安清單、動物、燈、搖籃曲、年齡的數量）、一晚的順序和計時（`evening.dart`：哪些段落、多久沒碰就往下、家長的分鐘到了接搖籃曲、搖籃曲的時鐘和最後兩分鐘變小聲）、故事的片段和組合（`story.dart`）、設定和紀錄（`game.dart`：一小時的鎖、最近七天、上次的故事）、小街的位置（`street_layout.dart`，`design/art/street.py` 產生，不要手改）、聲音（`sounds.dart`）、語音（`voice.dart`，國語慢速、句子之間停一下）、螢幕（`screen.dart`：保持開著、APP 視窗變暗、自己關掉）、存檔。
+- `app/lib/features/`：`evening/`（一段接一段、慢慢淡入淡出、多久沒碰和時間到）、`checklist/`、`lights/`（小街、窗戶裡的動物）、`sheep/`、`story/`、`breath/`、`lullaby/`（搖籃曲、最後的「換你去睡了」、只要搖籃曲的黑畫面）、`ended/`（關掉以後；iOS 停在這裡）、`parent/`（家長關卡、家長模式）。
+- 螢幕黑著但不睡：`app/android/.../MainActivity.kt` 和 `app/ios/Runner/AppDelegate.swift` 的 `goodnight_town/screen` 通道（視窗旗標，不要權限）。
+- 圖：`design/art/`（Python 畫 SVG：`kit.py` 畫法和檢查、`street.py` 小街和每一盞燈、`animals.py`、`sky.py`、`sheep.py`、`story.py`、`icons.py`、`icon.py` APP 圖示；`python3 build.py all` 全部重畫和檢查，`street OUT.png` 預覽小街，`fluttercheck` 用真的 flutter_svg 比對；說明在 `design/art/README.md`）。聲音：`design/sounds/make_sounds.py`（說明在 `README.md`）。
+- 測試：`rules_test`（規則）、`evening_test`（畫面上的規則）、`art_test`、`safety_test`、`version_test`、`flow_test`（手機 2～3 歲、平板 4～5 歲各走一晚，截圖）、`demo/demo_video_test`。
+
 ## 目前的狀態（2026-11-15）
-- 設計定案（`docs/design.md` 最後「已經決定的事」），0.1 開發中。
-- GitHub 專案使用者還沒建；先在本機的 `claude/relaxed-albattani-6mbwpz` 分支 commit，建好後再推。
+- 0.1.0 做好了，本機測試全部通過，示範影片和截圖在 `app/build/`；只 commit 在本機的 `claude/relaxed-albattani-6mbwpz` 分支。
+- GitHub 專案使用者還沒建；建好、加好 Secrets 後，照 `release-kids-app` 推上去（推 `main` 前要先問）。`docs/download-qr.png` 已經指向 `releases/latest`。
+- 還沒在真手機上試過：螢幕黑著時會不會睡、Android 自己關掉、窗戶的亮度、聲音的大小和慢速語音，都要用手機確認。

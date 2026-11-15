@@ -111,7 +111,7 @@
 - Flutter 3.47.8、Riverpod、flutter_svg、audioplayers、flutter_tts；存檔是一個 JSON 檔（`app/lib/core/store.dart`）。
 - 點和按住都用原始的手指事件（`Listener`）。
 - 圖用 Python 畫 SVG（`design/art/`：小街一份幾何、動物每隻醒著和睡著各一張、故事的場景和道具），聲音用 numpy 合成（`design/sounds/make_sounds.py`）。
-- 螢幕變暗：畫面上蓋一層黑，不用系統的亮度權限。搖籃曲播的時候用 `wakelock_plus` 讓螢幕黑著但不睡（畫面全黑，不會發光）。0.1 **不做**背景播放（鎖螢幕還能播需要 Android 的前景服務，比較複雜），0.2 再做（已決定）。
+- 螢幕變暗：畫面上蓋一層黑，不用系統的亮度權限。螢幕黑著但不睡：0.1 沒有用 `wakelock_plus`，改用 APP 自己視窗的「保持螢幕開著」（Android 的 `FLAG_KEEP_SCREEN_ON`、iOS 的 `isIdleTimerDisabled`），一樣不要任何權限；畫面全黑時，Android 再把 APP 自己視窗的亮度降到最低（不改手機的亮度設定）。時間到 Android 的 APP 自己關掉；iOS 不允許 APP 自己關，就停在全黑的「晚安」畫面。0.1 **不做**背景播放（鎖螢幕還能播需要 Android 的前景服務，比較複雜），0.2 再做（已決定）。
 - 資安和兄弟 APP 一樣：不接受別的 APP 傳來的頁面（`flutter_deeplinking_enabled` 關掉、`overridePlatformDefaultLocation`）、家長模式只能從家長關卡進去（`ParentPass`）、不要任何權限。
 - 名字（已決定）：GitHub 專案 `APP_Kids_Goodnight`；Flutter 專案 `goodnight_town`；applicationId `com.yaufan.goodnighttown`；APK 檔名 `goodnight-town-<版本>-arm64.apk`（另有 armv7、x86_64）；簽章的環境變數 `GOODNIGHT_TOWN_KEYSTORE`（第一版先和兄弟 APP 用同一把測試金鑰，Secrets 名稱照 `release-kids-app` skill）。
 - 工作流程（`app.yml`、`release.yml`、`cleanup.yml`）照小小生活家複製；第一次推 `main` 前要先問使用者。

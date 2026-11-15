@@ -64,5 +64,4 @@
 
 ## 目前的狀態（2026-11-15）
 - 0.1.0 做好、測試都過了；GitHub 專案建好了，工作分支 `claude/relaxed-albattani-6mbwpz` 已推上去（GitHub 的 main 只有建專案時自動加的檔案，已經合併進工作分支，所以之後 main 可以直接快轉）。推 main 前要先問，Secrets 要先加。
-- GitHub 專案使用者還沒建；建好、加好 Secrets 後，照 `release-kids-app` 推上去（推 `main` 前要先問）。`docs/download-qr.png` 已經指向 `releases/latest`。
 - 還沒在真手機上試過：螢幕黑著時會不會睡、Android 自己關掉、窗戶的亮度、聲音的大小和慢速語音，都要用手機確認。

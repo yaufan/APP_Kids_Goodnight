@@ -63,5 +63,5 @@
 - 測試：`rules_test`（規則）、`evening_test`（畫面上的規則）、`art_test`、`safety_test`、`version_test`、`flow_test`（手機 2～3 歲、平板 4～5 歲各走一晚，截圖）、`demo/demo_video_test`。
 
 ## 目前的狀態（2026-11-15）
-- 0.1.0 做好、測試都過了；GitHub 專案建好了，工作分支 `claude/relaxed-albattani-6mbwpz` 已推上去（GitHub 的 main 只有建專案時自動加的檔案，已經合併進工作分支，所以之後 main 可以直接快轉）。推 main 前要先問，Secrets 要先加。
+- 0.1.0 已發布（2026-11-15）：Releases 有三個 APK，App 和 Release 都成功；Secrets 加好了。
 - 還沒在真手機上試過：螢幕黑著時會不會睡、Android 自己關掉、窗戶的亮度、聲音的大小和慢速語音，都要用手機確認。

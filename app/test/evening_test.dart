@@ -124,4 +124,70 @@ void main() {
     expect(ParentPass.take(), isFalse);
     await app.end();
   });
+
+  testWidgets('time spent in parent mode does not count: not as idle, not against the minutes', (tester) async {
+    final app = await TestApp.start(tester, game: const Game(settings: Settings(minutes: 5)));
+    await app.wait(40);
+    await app.tapKey('parent-corner', ms: 800);
+    await app.answerGate();
+    expect(app.location, '/parent');
+    await app.wait(3);
+    app.now = app.now.add(const Duration(minutes: 6));
+    await app.wait(3);
+    await app.tapKey('parent-close', ms: 800);
+    expect(app.location, '/');
+    await app.wait(5);
+    expect(app.evening.current, Segment.checklist, reason: 'not passed by, and the 5 minutes are not up');
+    expect(app.evening.skipped, isEmpty);
+    // The checklist's minute counts from the last touch (the 「×」), the
+    // time in parent mode left out.
+    await app.wait(58);
+    expect(app.evening.current, isNot(Segment.checklist));
+    expect(app.evening.skipped, [Segment.checklist]);
+    // And the parent's minutes still run out, without the time away.
+    await app.wait(150);
+    expect(app.evening.current, isNot(Segment.lullaby));
+    await app.wait(60);
+    expect(app.evening.current, Segment.lullaby);
+    await app.end();
+  });
+
+  testWidgets('重新開始 gives a fresh evening: the first part is not skipped and starts afresh', (tester) async {
+    final app = await TestApp.start(tester);
+    await app.tapKey('check-teeth');
+    await app.wait(50);
+    await app.tapKey('parent-corner', ms: 800);
+    await app.answerGate();
+    await app.wait(30);
+    await app.tapKey('restart', ms: 800);
+    expect(app.location, '/');
+    expect(app.evening.run, 1);
+    await app.wait(5);
+    expect(app.evening.current, Segment.checklist, reason: 'a full minute again');
+    expect(app.evening.skipped, isEmpty);
+    app.sounds.played.clear();
+    await app.tapKey('check-teeth');
+    expect(app.sounds.played, contains('yawn_small'), reason: 'the card is lit again');
+    await app.end();
+  });
+
+  testWidgets('a long story read aloud is never cut: the wait starts after the last page', (tester) async {
+    final voice = SlowVoice(const Duration(seconds: 30));
+    final settings = const Settings(level: Level.big).copyWith(off: {Segment.checklist}, order: [Segment.story, Segment.lights, Segment.sheep, Segment.breath, Segment.checklist]);
+    final app = await TestApp.start(tester, game: Game(settings: settings), voice: voice);
+    expect(app.evening.current, Segment.story);
+    final pages = app.game.storyFor(app.now).pages(Level.big);
+    expect(pages.length, 5);
+    // Five pages of half a minute each: much longer than the 90 seconds.
+    await app.wait(120);
+    expect(app.evening.current, Segment.story, reason: 'still reading');
+    expect(app.evening.skipped, isEmpty);
+    await app.wait(60);
+    expect(app.evening.current, Segment.lights, reason: 'read to the end, then on');
+    expect(app.evening.skipped, isEmpty);
+    for (final p in pages) {
+      expect(voice.said, containsAll(p.lines));
+    }
+    await app.end();
+  });
 }

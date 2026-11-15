@@ -33,6 +33,12 @@ class EveningScreen extends ConsumerStatefulWidget {
 class _EveningScreenState extends ConsumerState<EveningScreen> {
   Timer? _tick;
   late DateTime _lastTouch = _now();
+
+  /// When parent mode (or the gate) covered the evening.
+  DateTime? _awaySince;
+
+  /// The part on screen is doing something by itself (reading the story).
+  var _busy = false;
   late final ScreenControl _screen = ref.read(screenProvider);
 
   DateTime _now() => ref.read(clockProvider)();
@@ -54,9 +60,23 @@ class _EveningScreenState extends ConsumerState<EveningScreen> {
   bool get _onTop => ModalRoute.of(context)?.isCurrent ?? true;
 
   void _check() {
-    if (!mounted || !_onTop) return;
+    if (!mounted) return;
     final now = _now();
-    final e = ref.read(eveningProvider);
+    if (!_onTop) {
+      _awaySince ??= now;
+      return;
+    }
+    var e = ref.read(eveningProvider);
+    final away = _awaySince;
+    if (away != null) {
+      // Time spent in parent mode does not count: not as the child being
+      // idle, not against the parent's minutes.
+      _awaySince = null;
+      final gone = now.difference(away);
+      _lastTouch = _lastTouch.add(gone);
+      e = e.shifted(gone);
+      ref.read(eveningProvider.notifier).set(e);
+    }
     final s = ref.read(gameProvider).settings;
     if (e.overTime(now, s)) {
       _set(e.timeUp());
@@ -65,7 +85,16 @@ class _EveningScreenState extends ConsumerState<EveningScreen> {
     final seg = e.current;
     if (seg == null) return;
     final idle = Evening.idleLimit(seg, s);
-    if (idle != null && now.difference(_lastTouch) >= idle) _set(e.next(passedBy: true));
+    if (idle != null && !_busy && now.difference(_lastTouch) >= idle) _set(e.next(passedBy: true));
+  }
+
+  /// The part [index] of evening [run] starts or stops doing something by
+  /// itself; the wait for a touch starts again after it.
+  void _working(int run, int index, bool busy) {
+    final e = ref.read(eveningProvider);
+    if (!mounted || e.run != run || e.index != index) return;
+    _busy = busy;
+    _lastTouch = _now();
   }
 
   void _next() => _set(ref.read(eveningProvider).next());
@@ -76,6 +105,7 @@ class _EveningScreenState extends ConsumerState<EveningScreen> {
     final now = _now();
     ref.read(eveningProvider.notifier).set(e);
     _lastTouch = now;
+    _busy = false;
     if (!before.saidGoodnight && e.saidGoodnight) {
       ref.read(gameProvider.notifier).change((g) => g.sayGoodnight(now, used: now.difference(e.started), skipped: e.skipped));
     }
@@ -83,13 +113,19 @@ class _EveningScreenState extends ConsumerState<EveningScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // A parent started the evening again: a fresh wait for the first part.
+    ref.listen(eveningProvider.select((e) => e.run), (_, _) {
+      _lastTouch = _now();
+      _busy = false;
+      _awaySince = null;
+    });
     final e = ref.watch(eveningProvider);
     final seg = e.current;
     final Widget view = switch (seg) {
       Segment.checklist => ChecklistView(onDone: _next),
       Segment.lights => LightsView(onDone: _next),
       Segment.sheep => SheepView(onDone: _next),
-      Segment.story => StoryView(onDone: _next),
+      Segment.story => StoryView(onDone: _next, onBusy: (b) => _working(e.run, e.index, b)),
       Segment.breath => BreathView(onDone: _next),
       Segment.lullaby => LullabyView(onDone: _next),
       null => const ClosingView(),
@@ -106,7 +142,7 @@ class _EveningScreenState extends ConsumerState<EveningScreen> {
                 child: AnimatedSwitcher(
                   duration: EveningScreen.fade,
                   layoutBuilder: fillSwitcher,
-                  child: KeyedSubtree(key: ValueKey('segment-${e.index}-${seg?.name ?? 'end'}'), child: view),
+                  child: KeyedSubtree(key: ValueKey('segment-${e.run}-${e.index}-${seg?.name ?? 'end'}'), child: view),
                 ),
               ),
               const Positioned.fill(child: DimLayer()),

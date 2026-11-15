@@ -16,14 +16,23 @@ List<Segment> eveningPlan(Settings s) {
 /// An evening under way: which part is on, when it started, what was
 /// passed by. After the last part comes the good night (「換你去睡了」).
 class Evening {
-  const Evening({required this.plan, required this.started, this.index = 0, this.skipped = const []});
+  const Evening({required this.plan, required this.started, this.index = 0, this.skipped = const [], this.run = 0});
 
-  factory Evening.start(Settings s, DateTime now) => Evening(plan: eveningPlan(s), started: now);
+  factory Evening.start(Settings s, DateTime now, {int run = 0}) => Evening(plan: eveningPlan(s), started: now, run: run);
 
   final List<Segment> plan;
+
+  /// When it began, less any time spent in parent mode ([shifted]).
   final DateTime started;
   final int index;
   final List<Segment> skipped;
+
+  /// Which evening since the app opened (a parent's 重新開始 begins the next
+  /// one, so every part starts afresh).
+  final int run;
+
+  /// The same evening with [away] (parent mode) not counted.
+  Evening shifted(Duration away) => Evening(plan: plan, started: started.add(away), index: index, skipped: skipped, run: run);
 
   /// Null once every part is over (the good night).
   Segment? get current => index < plan.length ? plan[index] : null;
@@ -38,7 +47,7 @@ class Evening {
   Evening next({bool passedBy = false}) {
     final c = current;
     if (c == null) return this;
-    return Evening(plan: plan, started: started, index: index + 1, skipped: passedBy ? [...skipped, c] : skipped);
+    return Evening(plan: plan, started: started, index: index + 1, skipped: passedBy ? [...skipped, c] : skipped, run: run);
   }
 
   /// The parent's minutes are up: whatever is on, the lullaby comes (or the
@@ -47,7 +56,7 @@ class Evening {
     if (saidGoodnight) return this;
     final lullaby = plan.indexOf(Segment.lullaby);
     final to = lullaby < 0 ? plan.length : lullaby;
-    return Evening(plan: plan, started: started, index: to, skipped: [...skipped, ...plan.sublist(index, to)]);
+    return Evening(plan: plan, started: started, index: to, skipped: [...skipped, ...plan.sublist(index, to)], run: run);
   }
 
   /// The evening (not counting the lullaby) has gone on as long as the
@@ -55,7 +64,9 @@ class Evening {
   bool overTime(DateTime now, Settings s) => !saidGoodnight && now.difference(started) >= Duration(minutes: s.minutes);
 
   /// How long a part waits for a touch before it quietly moves on (the
-  /// checklist a minute, docs/design.md; the lullaby never).
+  /// checklist a minute, docs/design.md; the lullaby never). The wait starts
+  /// again after the app has finished doing something (reading the story:
+  /// a part that is busy never times out).
   static Duration? idleLimit(Segment s, Settings settings) => switch (s) {
         Segment.checklist => const Duration(seconds: 60),
         Segment.lights || Segment.sheep => const Duration(seconds: 90),

@@ -42,5 +42,7 @@ class EveningNotifier extends Notifier<Evening> {
 
   void set(Evening e) => state = e;
 
-  void restart() => state = Evening.start(ref.read(gameProvider).settings, ref.read(clockProvider)());
+  /// A fresh evening (a parent's 重新開始): a new [Evening.run], so every
+  /// part on screen starts again.
+  void restart() => state = Evening.start(ref.read(gameProvider).settings, ref.read(clockProvider)(), run: state.run + 1);
 }

@@ -33,11 +33,11 @@ class TestApp {
   Evening get evening => container.read(eveningProvider);
   void change(Game Function(Game g) f) => container.read(gameProvider.notifier).change(f);
 
-  static Future<TestApp> start(WidgetTester tester, {Game game = const Game(), Size size = const Size(1080, 2340), double ratio = 2.75, DateTime? at}) async {
+  static Future<TestApp> start(WidgetTester tester, {Game game = const Game(), Size size = const Size(1080, 2340), double ratio = 2.75, DateTime? at, RecordingVoice? voice}) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = ratio;
     addTearDown(tester.view.reset);
-    final app = TestApp(tester, MemoryStore(), RecordingSounds(), RecordingVoice(), RecordingScreen(), at ?? DateTime(2026, 11, 15, 20, 30));
+    final app = TestApp(tester, MemoryStore(), RecordingSounds(), voice ?? RecordingVoice(), RecordingScreen(), at ?? DateTime(2026, 11, 15, 20, 30));
     await tester.pumpWidget(RepaintBoundary(
       key: shotKey,
       child: ProviderScope(
@@ -112,6 +112,23 @@ class TestApp {
   Future<void> end() async {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 2));
+  }
+}
+
+/// A voice that takes [perPage] to read a page aloud (on the test's fake
+/// clock), as a slow real voice would.
+class SlowVoice extends RecordingVoice {
+  SlowVoice(this.perPage);
+
+  final Duration perPage;
+  var reading = 0;
+
+  @override
+  Future<void> read(List<String> lines, {Duration pause = const Duration(seconds: 1)}) async {
+    reading++;
+    await super.read(lines, pause: pause);
+    await Future<void>.delayed(perPage);
+    reading--;
   }
 }
 

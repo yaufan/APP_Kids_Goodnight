@@ -16,9 +16,14 @@ import '../../core/voice.dart';
 /// by itself; a parent who turned reading off reads it aloud instead, the
 /// words are their prompt.
 class StoryView extends ConsumerStatefulWidget {
-  const StoryView({super.key, required this.onDone});
+  const StoryView({super.key, required this.onDone, this.onBusy});
 
   final VoidCallback onDone;
+
+  /// True while the app is reading or about to turn the page by itself
+  /// (the evening does not count that as nobody touching), false once the
+  /// last page has been read.
+  final void Function(bool busy)? onBusy;
 
   /// After a page is read, the next one comes this much later.
   static const pause = Duration(milliseconds: 2500);
@@ -67,6 +72,7 @@ class _StoryViewState extends ConsumerState<StoryView> {
     final turn = ++_turn;
     _timer?.cancel();
     if (!_reads) return;
+    widget.onBusy?.call(true);
     _timer = Timer(const Duration(milliseconds: 1200), () async {
       if (!mounted || turn != _turn) return;
       await _voice.read(_pages[_page].lines);
@@ -86,6 +92,7 @@ class _StoryViewState extends ConsumerState<StoryView> {
       _done = true;
       _turn++;
       _timer?.cancel();
+      widget.onBusy?.call(false);
       _timer = Timer(const Duration(milliseconds: 1500), () {
         if (mounted) widget.onDone();
       });

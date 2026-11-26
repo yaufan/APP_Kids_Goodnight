@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/game.dart';
 import '../core/providers.dart';
 import '../features/ended/ended_screen.dart';
 import '../features/evening/evening_screen.dart';
@@ -15,11 +16,11 @@ import 'theme.dart';
 /// The pages: the evening (`/`), the lullaby alone (`/lullaby`: 「只要搖籃曲」,
 /// or opened again within an hour of good night), the end (`/ended`, where
 /// iOS stays because an app cannot close itself there) and parent mode.
+/// Only the lullaby: 「只要搖籃曲」, or within the hour after good night.
+bool lullabyOnlyNow(Game g, DateTime now) => g.settings.lullabyOnly || g.locked(now);
+
 final routerProvider = Provider<GoRouter>((ref) {
-  bool lullabyOnly() {
-    final g = ref.read(gameProvider);
-    return g.settings.lullabyOnly || g.locked(ref.read(clockProvider)());
-  }
+  bool lullabyOnly() => lullabyOnlyNow(ref.read(gameProvider), ref.read(clockProvider)());
 
   final router = GoRouter(
     initialLocation: lullabyOnly() ? '/lullaby' : '/',
@@ -52,7 +53,9 @@ class GoodnightApp extends ConsumerWidget {
     ref.read(soundsProvider)
       ..volume = s.volume
       ..effects = s.sounds;
-    ref.read(voiceProvider).slow = s.slowVoice;
+    ref.read(voiceProvider)
+      ..slow = s.slowVoice
+      ..volume = s.volume;
     return MaterialApp.router(
       title: Strings.appName,
       debugShowCheckedModeBanner: false,
@@ -61,6 +64,51 @@ class GoodnightApp extends ConsumerWidget {
       supportedLocales: const [Locale('zh', 'TW')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       routerConfig: ref.watch(routerProvider),
+      builder: (_, child) => AwayGuard(child: child ?? const SizedBox()),
     );
   }
+}
+
+/// Back after [away] or more with the app in the background, it starts
+/// afresh, as if it were opened again: tonight's evening from the start, or
+/// only the lullaby within the hour after good night. Less than that, the
+/// evening and the lullaby go on where they were, the time away not counted.
+class AwayGuard extends ConsumerStatefulWidget {
+  const AwayGuard({super.key, required this.child});
+
+  static const away = Tonight.keep;
+
+  final Widget child;
+
+  @override
+  ConsumerState<AwayGuard> createState() => _AwayGuardState();
+}
+
+class _AwayGuardState extends ConsumerState<AwayGuard> {
+  AppLifecycleListener? _life;
+  DateTime? _hiddenAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _life = AppLifecycleListener(
+      onHide: () => _hiddenAt ??= ref.read(clockProvider)(),
+      onShow: () {
+        final at = _hiddenAt, now = ref.read(clockProvider)();
+        _hiddenAt = null;
+        if (at == null || now.difference(at) < AwayGuard.away) return;
+        ref.read(eveningProvider.notifier).restart();
+        ref.read(routerProvider).go(lullabyOnlyNow(ref.read(gameProvider), now) ? '/lullaby' : '/');
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _life?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

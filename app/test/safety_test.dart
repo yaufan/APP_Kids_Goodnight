@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:goodnight_town/core/sounds.dart';
 import 'package:goodnight_town/features/parent/parent_gate.dart';
 
 import 'helpers.dart';
@@ -26,6 +28,47 @@ void main() {
     for (final f in Directory('android/app/src/main').listSync(recursive: true).whereType<File>()) {
       if (f.path.endsWith('.xml')) expect(f.readAsStringSync(), isNot(contains('WAKE_LOCK')), reason: f.path);
     }
+  });
+
+  test('Android 11+ can find the speech engine', () {
+    final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    expect(manifest, contains('<action android:name="android.intent.action.TTS_SERVICE" />'));
+    expect(RegExp(r'<queries>[\s\S]*TTS_SERVICE[\s\S]*</queries>').hasMatch(manifest), isTrue);
+  });
+
+  test('nothing is backed up or moved to another phone', () {
+    final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    expect(manifest, contains('android:allowBackup="false"'));
+    expect(manifest, contains('android:fullBackupContent="false"'));
+    expect(manifest, contains('android:dataExtractionRules="@xml/data_extraction_rules"'));
+    final rules = File('android/app/src/main/res/xml/data_extraction_rules.xml').readAsStringSync();
+    for (final part in ['cloud-backup', 'device-transfer']) {
+      final block = RegExp('<$part>([\\s\\S]*?)</$part>').firstMatch(rules)!.group(1)!;
+      for (final domain in ['root', 'file', 'database', 'sharedpref', 'external']) {
+        expect(block, contains('<exclude domain="$domain" path="." />'), reason: '$part $domain');
+      }
+    }
+  });
+
+  test('the GitHub check fails on a camera, microphone, contacts, photos or location permission', () {
+    for (final f in ['../.github/workflows/app.yml', '../.github/workflows/release.yml']) {
+      final yml = File(f).readAsStringSync();
+      for (final p in ['INTERNET', 'LOCATION', 'AD_ID', 'WAKE_LOCK', 'CAMERA', 'RECORD_AUDIO', 'READ_CONTACTS', 'READ_MEDIA_', 'READ_EXTERNAL_STORAGE']) {
+        expect(RegExp("grep -E '[^']*$p").hasMatch(yml), isTrue, reason: '$f $p');
+      }
+    }
+  });
+
+  test('sounds play on the media stream, not the ringer, and never take the audio focus', () {
+    final a = soundContext.android;
+    expect(a.usageType, AndroidUsageType.media);
+    expect(a.contentType, AndroidContentType.music);
+    expect(a.audioFocus, AndroidAudioFocus.none);
+    expect(soundContext.iOS.category, AVAudioSessionCategory.ambient);
+    final code = File('lib/core/sounds.dart').readAsStringSync();
+    expect(code, isNot(contains('respectSilence: true')));
+    expect(code, contains('audioContext: soundContext'), reason: 'every sound pool');
+    expect(code, contains('loop.setAudioContext(soundContext)'), reason: 'the loops');
   });
 
   testWidgets('parent mode and unknown pages cannot be opened without the gate', (tester) async {

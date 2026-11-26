@@ -199,10 +199,79 @@ class Week {
   final Segment? mostSkipped;
 }
 
+/// Tonight's evening when the app was last seen (before the lullaby): how
+/// much of it has gone by and which part it was on. Opened again within ten
+/// minutes, the app goes on with it (the time it was closed does not count);
+/// later, a new evening starts.
+class Tonight {
+  const Tonight({required this.used, required this.index, required this.seen});
+
+  final Duration used;
+  final int index;
+  final DateTime seen;
+
+  static const keep = Duration(minutes: 10);
+
+  /// Still the same evening at [now] (a clock moved back counts as soon).
+  bool goesOn(DateTime now) => now.difference(seen) < keep;
+
+  Map<String, dynamic> toJson() => {'used': used.inSeconds, 'index': index, 'seen': seen.toIso8601String()};
+
+  static Tonight? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    final u = j['used'], i = j['index'], seen = j['seen'] is String ? DateTime.tryParse(j['seen'] as String) : null;
+    if (u is! int || u < 0 || i is! int || i < 0 || seen == null) return null;
+    return Tonight(used: Duration(seconds: u), index: i, seen: seen);
+  }
+}
+
+/// The parent gate's lock, kept in the file so restarting the app does not
+/// clear it: three wrong answers in a row lock the gate for a minute, the
+/// next three for five minutes, then fifteen; a right answer starts again.
+class GateLock {
+  const GateLock({this.misses = 0, this.locks = 0, this.since});
+
+  /// Wrong answers since the last lock (or the last right answer).
+  final int misses;
+
+  /// Locks since the last right answer.
+  final int locks;
+
+  /// When the last lock began.
+  final DateTime? since;
+
+  static const maxMisses = 3;
+  static const lengths = [Duration(minutes: 1), Duration(minutes: 5), Duration(minutes: 15)];
+
+  /// How long the last lock lasts.
+  Duration get length => lengths[(locks - 1).clamp(0, lengths.length - 1)];
+
+  /// When the lock ends (null: not locked now). A clock moved back to before
+  /// the lock began does not lock the gate: such a lock would never end.
+  DateTime? until(DateTime now) {
+    final s = since;
+    if (s == null || locks == 0 || now.isBefore(s)) return null;
+    final end = s.add(length);
+    return now.isBefore(end) ? end : null;
+  }
+
+  /// A wrong answer at [now].
+  GateLock wrong(DateTime now) => misses + 1 >= maxMisses ? GateLock(locks: locks + 1, since: now) : GateLock(misses: misses + 1, locks: locks, since: since);
+
+  Map<String, dynamic> toJson() => {'misses': misses, 'locks': locks, if (since != null) 'since': since!.toIso8601String()};
+
+  factory GateLock.fromJson(dynamic j) {
+    if (j is! Map) return const GateLock();
+    int count(Object? v) => v is int && v >= 0 ? v : 0;
+    return GateLock(misses: count(j['misses']).clamp(0, maxMisses - 1), locks: count(j['locks']), since: j['since'] is String ? DateTime.tryParse(j['since'] as String) : null);
+  }
+}
+
 /// Everything kept on the phone: the settings, when good night was said,
-/// the last story, the last evenings. One small file (store.dart).
+/// the last story, the last evenings, tonight's evening so far, the parent
+/// gate's lock. One small file (store.dart).
 class Game {
-  const Game({this.settings = const Settings(), this.goodnightAt, this.lastStory, this.lastStoryNight, this.history = const []});
+  const Game({this.settings = const Settings(), this.goodnightAt, this.lastStory, this.lastStoryNight, this.history = const [], this.tonight, this.gate = const GateLock()});
 
   final Settings settings;
 
@@ -215,23 +284,31 @@ class Game {
   final int? lastStoryNight;
   final List<NightRecord> history;
 
+  /// Tonight's evening before the lullaby, as last seen (null: none).
+  final Tonight? tonight;
+
+  final GateLock gate;
+
   static const lockLength = Duration(hours: 1);
   static const historyKept = 14;
 
-  /// Good night was said less than an hour ago.
+  /// Good night was said less than an hour ago. A clock moved back a little
+  /// does not end the hour early; moved back more than an hour, it is over
+  /// (a lock that would never end).
   bool locked(DateTime now) {
     final at = goodnightAt;
     if (at == null) return false;
-    final d = now.difference(at);
-    return !d.isNegative && d < lockLength;
+    return now.difference(at).abs() < lockLength;
   }
 
-  Game copyWith({Settings? settings, DateTime? goodnightAt, bool unlock = false, String? lastStory, int? lastStoryNight, List<NightRecord>? history}) => Game(
+  Game copyWith({Settings? settings, DateTime? goodnightAt, bool unlock = false, String? lastStory, int? lastStoryNight, List<NightRecord>? history, Tonight? tonight, bool clearTonight = false, GateLock? gate}) => Game(
         settings: settings ?? this.settings,
         goodnightAt: unlock ? null : (goodnightAt ?? this.goodnightAt),
         lastStory: lastStory ?? this.lastStory,
         lastStoryNight: lastStoryNight ?? this.lastStoryNight,
         history: history ?? this.history,
+        tonight: clearTonight ? null : (tonight ?? this.tonight),
+        gate: gate ?? this.gate,
       );
 
   /// Tonight's story: the one already chosen tonight, or a new one that is
@@ -252,7 +329,7 @@ class Game {
     final night = nightNumber(now);
     final record = NightRecord(night: night, seconds: used.inSeconds, skipped: skipped);
     final kept = [for (final r in history) if (r.night != night) r, record];
-    return copyWith(goodnightAt: now, history: kept.skip(math.max(0, kept.length - historyKept)).toList());
+    return copyWith(goodnightAt: now, history: kept.skip(math.max(0, kept.length - historyKept)).toList(), clearTonight: true);
   }
 
   /// The last seven days (nights, average minutes, the part most often
@@ -281,6 +358,8 @@ class Game {
         if (lastStory != null) 'lastStory': lastStory,
         if (lastStoryNight != null) 'lastStoryNight': lastStoryNight,
         'history': [for (final r in history) r.toJson()],
+        if (tonight != null) 'tonight': tonight!.toJson(),
+        'gate': gate.toJson(),
       };
 
   factory Game.fromJson(Map<String, dynamic>? j) {
@@ -295,6 +374,8 @@ class Game {
         if (h is List)
           for (final r in h) ?NightRecord.fromJson(r),
       ],
+      tonight: Tonight.fromJson(j['tonight']),
+      gate: GateLock.fromJson(j['gate']),
     );
   }
 }

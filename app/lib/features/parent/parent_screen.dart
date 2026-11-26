@@ -5,15 +5,18 @@ import 'package:go_router/go_router.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../app/version.dart';
+import '../../app/widgets.dart';
 import '../../core/content.dart';
 import '../../core/game.dart';
 import '../../core/providers.dart';
 import '../../core/sounds.dart';
+import 'parent_gate.dart';
 
 /// Parent mode (after the gate; docs/design.md 「家長模式」): the age, the
 /// evening's minutes, tonight's parts and their order, the lullaby, reading
 /// the story, the screen's darkness and the sound, the one-hour lock, the
-/// last seven days and the full version.
+/// last seven days and the full version. It closes by itself after five
+/// minutes without a touch, so the evening always goes on to its end.
 class ParentScreen extends ConsumerStatefulWidget {
   const ParentScreen({super.key});
 
@@ -38,15 +41,19 @@ class _ParentScreenState extends ConsumerState<ParentScreen> {
 
   void _close() => context.canPop() ? context.pop() : context.go('/');
 
+  // The back key, five minutes without a touch or the app going to the
+  // background close parent mode (back to the evening).
+  @override
+  Widget build(BuildContext context) => ParentIdle(onClose: _close, child: BackTo(onBack: _close, child: _page(context)));
+
   /// Tonight from the start (and the hour's lock lifted).
   void _restart() {
-    ref.read(gameProvider.notifier).change((g) => g.copyWith(unlock: true));
+    ref.read(gameProvider.notifier).change((g) => g.copyWith(unlock: true, clearTonight: true));
     ref.read(eveningProvider.notifier).restart();
     context.go(ref.read(gameProvider).settings.lullabyOnly ? '/lullaby' : '/');
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _page(BuildContext context) {
     final g = ref.watch(gameProvider);
     final s = g.settings;
     final game = ref.read(gameProvider.notifier);
@@ -105,7 +112,7 @@ class _ParentScreenState extends ConsumerState<ParentScreen> {
         body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
           section(Strings.tonight, [
             if (locked) ...[
-              Text(Strings.lockedLine(Game.lockLength.inMinutes - now.difference(g.goodnightAt!).inMinutes), style: const TextStyle(fontSize: 16, height: 1.5)),
+              Text(Strings.lockedLine((Game.lockLength.inMinutes - now.difference(g.goodnightAt!).inMinutes).clamp(1, Game.lockLength.inMinutes)), style: const TextStyle(fontSize: 16, height: 1.5)),
               const SizedBox(height: 8),
             ],
             FilledButton.tonal(key: const ValueKey('restart'), onPressed: _restart, child: Text(locked ? Strings.unlock : Strings.restart)),

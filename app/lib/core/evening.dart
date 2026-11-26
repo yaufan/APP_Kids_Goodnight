@@ -31,8 +31,32 @@ class Evening {
   /// one, so every part starts afresh).
   final int run;
 
-  /// The same evening with [away] (parent mode) not counted.
+  /// The same evening with [away] (parent mode, the background) not
+  /// counted; a negative [away] is a clock moved back, which gives no extra
+  /// time.
   Evening shifted(Duration away) => Evening(plan: plan, started: started.add(away), index: index, skipped: skipped, run: run);
+
+  /// The parent changed tonight's parts (parent mode, 「今晚要做哪些」): the
+  /// parts already done stay, the rest follow [next] (a part turned off goes,
+  /// 「只要搖籃曲」 goes straight to the lullaby). The part on screen goes on
+  /// if it is still next. Once good night is said nothing changes.
+  Evening replanned(List<Segment> next) {
+    if (saidGoodnight) return this;
+    final done = plan.sublist(0, index);
+    return Evening(plan: [...done, ...next.where((s) => !done.contains(s))], started: started, index: index, skipped: skipped, run: run);
+  }
+
+  /// Whether [next] would change the parts still to come.
+  bool differs(List<Segment> next) {
+    final done = plan.sublist(0, index);
+    final rest = next.where((s) => !done.contains(s)).toList();
+    final now = plan.sublist(index);
+    if (rest.length != now.length) return true;
+    for (var i = 0; i < rest.length; i++) {
+      if (rest[i] != now[i]) return true;
+    }
+    return false;
+  }
 
   /// Null once every part is over (the good night).
   Segment? get current => index < plan.length ? plan[index] : null;

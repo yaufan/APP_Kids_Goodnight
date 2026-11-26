@@ -9,7 +9,6 @@ import '../../app/widgets.dart';
 import '../../core/providers.dart';
 import '../../core/sounds.dart';
 import '../../core/story.dart';
-import '../../core/voice.dart';
 
 /// 晚安故事 (docs/design.md): tonight's story, a few big lines a page under
 /// a small silhouette picture. The app reads it slowly and turns the page
@@ -32,16 +31,24 @@ class StoryView extends ConsumerStatefulWidget {
   ConsumerState<StoryView> createState() => _StoryViewState();
 }
 
-class _StoryViewState extends ConsumerState<StoryView> {
+class _StoryViewState extends ConsumerState<StoryView> with HushOnLeave {
   late final Sounds _sounds = ref.read(soundsProvider);
-  late final Voice _voice = ref.read(voiceProvider);
   late final Story _story;
   late final List<StoryPage> _pages;
-  late final bool _reads = ref.read(gameProvider).settings.readStory && ref.read(gameProvider).settings.voice;
   var _page = 0;
   var _turn = 0;
   var _done = false;
   Timer? _timer;
+
+  /// A parent screen is over the story: it waits (no reading, no turning).
+  var _covered = false;
+
+  /// The app reads (as the parent set it now: turned off in parent mode, the
+  /// story stops reading at once).
+  bool get _reads {
+    final s = ref.read(gameProvider).settings;
+    return s.readStory && s.voice;
+  }
 
   @override
   void initState() {
@@ -62,20 +69,43 @@ class _StoryViewState extends ConsumerState<StoryView> {
   void dispose() {
     _timer?.cancel();
     _turn++;
-    _voice.stop();
     _sounds.release(this);
     super.dispose();
+  }
+
+  /// Parent mode (or the gate) came over the story: it stops reading and
+  /// waits; back on top, the page is read again from its start.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final covered = !(ModalRoute.isCurrentOf(context) ?? true);
+    if (covered == _covered) return;
+    _covered = covered;
+    if (covered) {
+      _turn++;
+      _timer?.cancel();
+      hush();
+    } else if (!_done) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_covered && !_done) _show();
+      });
+    }
   }
 
   /// A page is on screen: read it (if the app reads), then turn.
   void _show() {
     final turn = ++_turn;
     _timer?.cancel();
-    if (!_reads) return;
+    if (_covered) return;
+    if (!_reads) {
+      // A parent reads: the evening's wait for a touch goes on.
+      widget.onBusy?.call(false);
+      return;
+    }
     widget.onBusy?.call(true);
     _timer = Timer(const Duration(milliseconds: 1200), () async {
       if (!mounted || turn != _turn) return;
-      await _voice.read(_pages[_page].lines);
+      await readAloud(ref, _pages[_page].lines);
       if (!mounted || turn != _turn) return;
       _timer = Timer(StoryView.pause, () {
         if (mounted && turn == _turn) _next();
@@ -87,7 +117,7 @@ class _StoryViewState extends ConsumerState<StoryView> {
 
   void _next() {
     if (_done) return;
-    _voice.stop();
+    hush();
     if (_page >= _pages.length - 1) {
       _done = true;
       _turn++;
@@ -106,6 +136,7 @@ class _StoryViewState extends ConsumerState<StoryView> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(gameProvider.select((g) => g.settings.readStory && g.settings.voice));
     final p = _pages[_page];
     final last = _page == _pages.length - 1;
     return NightSky(

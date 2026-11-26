@@ -43,6 +43,28 @@ class SystemScreen implements ScreenControl {
   }
 }
 
+/// The screen is kept awake while one of its owners (a screen on top) wants
+/// it, and not a moment longer: covered by a parent screen, or the evening
+/// over, the phone sleeps as it always does.
+class Awake {
+  Awake(this._screen);
+
+  final ScreenControl _screen;
+  final _owners = <Object>{};
+
+  bool get on => _owners.isNotEmpty;
+
+  void set(Object owner, bool on) {
+    final before = this.on;
+    if (on) {
+      _owners.add(owner);
+    } else {
+      _owners.remove(owner);
+    }
+    if (this.on != before) _screen.keepOn(this.on);
+  }
+}
+
 /// Remembers what was asked (tests).
 class RecordingScreen implements ScreenControl {
   var awake = false;

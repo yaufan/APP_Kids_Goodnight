@@ -26,11 +26,14 @@ class BreathView extends ConsumerStatefulWidget {
 
 enum _Phase { demo, waiting, inhale, exhale, done }
 
-class _BreathViewState extends ConsumerState<BreathView> with SingleTickerProviderStateMixin {
+class _BreathViewState extends ConsumerState<BreathView> with SingleTickerProviderStateMixin, HushOnLeave {
   late final Sounds _sounds = ref.read(soundsProvider);
   late final int _total = ref.read(gameProvider).settings.level.breaths;
   late final _moon = AnimationController(vsync: this);
   final _timers = <Timer>[];
+
+  /// Waits for a last line to be said before going on.
+  final _waits = <Later>[];
   var _phase = _Phase.demo;
   var _count = 0;
   DateTime? _pressed;
@@ -52,6 +55,9 @@ class _BreathViewState extends ConsumerState<BreathView> with SingleTickerProvid
     for (final t in _timers) {
       t.cancel();
     }
+    for (final w in _waits) {
+      w.cancel();
+    }
     _moon.dispose();
     _sounds.release(this);
     super.dispose();
@@ -60,6 +66,10 @@ class _BreathViewState extends ConsumerState<BreathView> with SingleTickerProvid
   void _later(Duration d, VoidCallback f) => _timers.add(Timer(d, () {
         if (mounted) f();
       }));
+
+  void _finish() {
+    if (mounted) widget.onDone();
+  }
 
   void _inhale() {
     _seq++;
@@ -108,8 +118,7 @@ class _BreathViewState extends ConsumerState<BreathView> with SingleTickerProvid
     if (_count >= _total) {
       _later(Breath.exhale, () {
         setState(() => _phase = _Phase.done);
-        speak(ref, Strings.breathAll);
-        _later(const Duration(milliseconds: 4500), widget.onDone);
+        _waits.add(Later(const Duration(milliseconds: 4500), _finish, after: speak(ref, Strings.breathAll)));
       });
     }
   }

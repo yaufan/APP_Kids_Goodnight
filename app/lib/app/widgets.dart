@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -9,6 +10,8 @@ import 'package:go_router/go_router.dart';
 
 import '../core/content.dart';
 import '../core/providers.dart';
+import '../core/screen.dart';
+import '../core/voice.dart';
 import '../features/parent/parent_gate.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -349,8 +352,138 @@ class KidScale extends StatelessWidget {
 /// Cross-fades one whole screen into the next (both fill the space).
 Widget fillSwitcher(Widget? current, List<Widget> previous) => Stack(fit: StackFit.expand, children: [...previous, ?current]);
 
-/// Says a line out loud, slowly (if the parent left the voice on).
-void speak(WidgetRef ref, String text) {
-  if (!ref.read(gameProvider).settings.voice) return;
-  ref.read(voiceProvider).say(text);
+/// The screen that spoke last (its WidgetRef), so a part going away hushes
+/// only its own line, never the next part's first one.
+Object? _speaker;
+
+/// Says a line out loud, slowly (if the parent left the voice on). Nothing
+/// is said while a parent screen is open. Completes when it has been said
+/// (or cut off by the next line).
+Future<void> speak(WidgetRef ref, String text) => _mayTalk(ref) ? ref.read(voiceProvider).say(text) : Future.value();
+
+/// Reads [lines] one after another (the story), as [speak].
+Future<void> readAloud(WidgetRef ref, List<String> lines) => _mayTalk(ref) ? ref.read(voiceProvider).read(lines) : Future.value();
+
+/// The voice is on and no parent screen is open; [ref] speaks now.
+bool _mayTalk(WidgetRef ref) {
+  if (!ref.read(gameProvider).settings.voice || ParentIdle.showing.value > 0) return false;
+  _speaker = ref;
+  return true;
+}
+
+/// A part that stops its own voice when it goes away, so a line does not go
+/// on over the next part (and never stops the next part's first line).
+mixin HushOnLeave<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+  late final Voice _hush;
+  late final Object _me;
+
+  @override
+  void initState() {
+    super.initState();
+    _hush = ref.read(voiceProvider);
+    _me = ref;
+  }
+
+  /// Stops this part's line (if it is the one speaking).
+  void hush() {
+    if (identical(_speaker, _me)) {
+      _speaker = null;
+      _hush.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    hush();
+    super.dispose();
+  }
+}
+
+/// Runs [then] after [min], and not before the line [after] has been said
+/// (at most [atMost] of waiting for it), so a slow voice is not cut off by
+/// the next part; [cancel] stops it.
+class Later {
+  Later(Duration min, VoidCallback then, {Future<void>? after, Duration atMost = const Duration(seconds: 20)}) : _then = then {
+    _timer = Timer(min, () {
+      _timeUp = true;
+      _fire();
+    });
+    if (after == null) {
+      _heard = true;
+    } else {
+      _limit = Timer(atMost, _hear);
+      after.then((_) => _hear(), onError: (_) => _hear());
+    }
+  }
+
+  final VoidCallback _then;
+  late final Timer _timer;
+  Timer? _limit;
+  var _timeUp = false, _heard = false, _over = false;
+
+  void _hear() {
+    _limit?.cancel();
+    _heard = true;
+    _fire();
+  }
+
+  void _fire() {
+    if (_over || !_timeUp || !_heard) return;
+    _over = true;
+    _then();
+  }
+
+  void cancel() {
+    _over = true;
+    _timer.cancel();
+    _limit?.cancel();
+  }
+}
+
+/// The phone's back key (or back gesture) does [onBack] (null: nothing)
+/// instead of closing the app in the middle of the evening.
+class BackTo extends StatelessWidget {
+  const BackTo({super.key, this.onBack, required this.child});
+
+  final VoidCallback? onBack;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) onBack?.call();
+        },
+        child: child,
+      );
+}
+
+/// Keeps the screen awake while [child]'s page is on top (awakeProvider):
+/// a parent screen over it, or the page gone, and the phone may sleep.
+class AwakeOnTop extends ConsumerStatefulWidget {
+  const AwakeOnTop({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<AwakeOnTop> createState() => _AwakeOnTopState();
+}
+
+class _AwakeOnTopState extends ConsumerState<AwakeOnTop> {
+  late final Awake _awake = ref.read(awakeProvider);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _awake.set(this, ModalRoute.isCurrentOf(context) ?? true);
+  }
+
+  @override
+  void dispose() {
+    _awake.set(this, false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

@@ -69,7 +69,8 @@ void main() {
       expect(g.locked(evening), isTrue);
       expect(g.locked(evening.add(const Duration(minutes: 59, seconds: 59))), isTrue);
       expect(g.locked(evening.add(const Duration(hours: 1))), isFalse);
-      expect(g.locked(evening.subtract(const Duration(minutes: 5))), isFalse, reason: 'a clock set back does not lock forever');
+      expect(g.locked(evening.subtract(const Duration(minutes: 5))), isTrue, reason: 'a clock set back a little does not end the hour early');
+      expect(g.locked(evening.subtract(const Duration(hours: 2))), isFalse, reason: 'a clock set back does not lock forever');
       expect(g.copyWith(unlock: true).locked(evening), isFalse);
       expect(const Game().locked(evening), isFalse);
     });

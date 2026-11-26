@@ -48,7 +48,7 @@ abstract final class Strings {
   static const howLong = '多久以後關掉';
   static String minutes(int m) => '$m 分鐘';
   static String minutesLeft(int m) => '還剩 $m 分鐘';
-  static const lullabyNote = '螢幕會慢慢變黑，\n手機可以蓋起來放旁邊。';
+  static const lullabyNote = '螢幕會慢慢變黑，\n手機蓋起來放旁邊就好，\n不要按電源鍵（聲音會停）。';
   static const lullabyFoot = '搖籃曲停了，APP 就自己關掉。';
 
   // The end.
@@ -60,9 +60,12 @@ abstract final class Strings {
   static const callParent = '請爸爸媽媽來';
   static const parentGateTitle = '家長確認';
   static String gateQuestion(String a, String b) => '$a 加 $b 等於多少？';
-  static const gateRules = '用下面的數字回答。';
+  static const gateRules = '用下面的數字回答。答錯三次要等一分鐘，再錯會等更久。';
   static const wrongAnswer = '不對喔，換一題。';
-  static String gateWait(int s) => '請等 $s 秒再試。';
+  static String gateWait(Duration d) {
+    final s = (d.inMilliseconds / 1000).ceil();
+    return s > 60 ? '請等 ${(s + 59) ~/ 60} 分鐘再試。' : '請等 $s 秒再試。';
+  }
   static const backspace = '刪掉';
   static const cancel = '取消';
   static const back = '回去';

@@ -26,11 +26,14 @@ class SheepView extends ConsumerStatefulWidget {
   ConsumerState<SheepView> createState() => _SheepViewState();
 }
 
-class _SheepViewState extends ConsumerState<SheepView> with SingleTickerProviderStateMixin {
+class _SheepViewState extends ConsumerState<SheepView> with SingleTickerProviderStateMixin, HushOnLeave {
   late final Sounds _sounds = ref.read(soundsProvider);
   late final int _total = ref.read(gameProvider).settings.level.sheep;
   late final _hop = AnimationController(vsync: this, duration: sheepJump)..addStatusListener(_landed);
   final _timers = <Timer>[];
+
+  /// Waits for a last line to be said before going on.
+  final _waits = <Later>[];
   var _count = 0;
   var _jumping = false;
 
@@ -48,6 +51,9 @@ class _SheepViewState extends ConsumerState<SheepView> with SingleTickerProvider
     for (final t in _timers) {
       t.cancel();
     }
+    for (final w in _waits) {
+      w.cancel();
+    }
     _hop.dispose();
     _sounds.release(this);
     super.dispose();
@@ -56,6 +62,10 @@ class _SheepViewState extends ConsumerState<SheepView> with SingleTickerProvider
   void _later(Duration d, VoidCallback f) => _timers.add(Timer(d, () {
         if (mounted) f();
       }));
+
+  void _finish() {
+    if (mounted) widget.onDone();
+  }
 
   void _tap() {
     if (_jumping || _count >= _total) return;
@@ -73,8 +83,7 @@ class _SheepViewState extends ConsumerState<SheepView> with SingleTickerProvider
     speak(ref, zhNumber(_count));
     _later(const Duration(milliseconds: 1200), () => _sounds.play('baa'));
     if (_count == _total) {
-      _later(const Duration(milliseconds: 2600), () => speak(ref, Strings.sheepAll));
-      _later(const Duration(milliseconds: 7000), widget.onDone);
+      _later(const Duration(milliseconds: 2600), () => _waits.add(Later(const Duration(milliseconds: 4400), _finish, after: speak(ref, Strings.sheepAll))));
     }
   }
 

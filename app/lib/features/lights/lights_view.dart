@@ -27,11 +27,14 @@ class LightsView extends ConsumerStatefulWidget {
   ConsumerState<LightsView> createState() => _LightsViewState();
 }
 
-class _LightsViewState extends ConsumerState<LightsView> {
+class _LightsViewState extends ConsumerState<LightsView> with HushOnLeave {
   late final Sounds _sounds = ref.read(soundsProvider);
   late final List<Light> _lit = ref.read(gameProvider).settings.level.lights;
   final _off = <Light>{};
   final _timers = <Timer>[];
+
+  /// Waits for a last line to be said before going on.
+  final _waits = <Later>[];
   late final String _line = isDaytime(ref.read(clockProvider)()) ? Strings.notYet : Strings.lightsStart;
   var _ended = false;
 
@@ -49,6 +52,9 @@ class _LightsViewState extends ConsumerState<LightsView> {
     for (final t in _timers) {
       t.cancel();
     }
+    for (final w in _waits) {
+      w.cancel();
+    }
     _sounds.release(this);
     super.dispose();
   }
@@ -56,6 +62,10 @@ class _LightsViewState extends ConsumerState<LightsView> {
   void _later(Duration d, VoidCallback f) => _timers.add(Timer(d, () {
         if (mounted) f();
       }));
+
+  void _finish() {
+    if (mounted) widget.onDone();
+  }
 
   void _music() => _sounds.hold(this, Music.street(_dark), level: 1 - 0.35 * _dark);
 
@@ -72,8 +82,7 @@ class _LightsViewState extends ConsumerState<LightsView> {
     _music();
     if (_off.length == _lit.length && !_ended) {
       _ended = true;
-      _later(const Duration(milliseconds: 4200), () => speak(ref, Strings.lightsAll));
-      _later(const Duration(milliseconds: 9000), widget.onDone);
+      _later(const Duration(milliseconds: 4200), () => _waits.add(Later(const Duration(milliseconds: 4800), _finish, after: speak(ref, Strings.lightsAll))));
     }
   }
 

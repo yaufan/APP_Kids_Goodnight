@@ -9,6 +9,7 @@ import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../../core/content.dart';
 import '../../core/evening.dart';
+import '../../core/game.dart';
 import '../../core/providers.dart';
 import '../../core/screen.dart';
 import '../../core/sounds.dart';
@@ -17,7 +18,10 @@ import '../../core/sounds.dart';
 /// a faint moon and 「還剩 18 分鐘」, and the whole screen slowly goes black
 /// (the window's own brightness turned down too). The phone stays awake but
 /// gives no light. The sound gets quieter over the last two minutes; when
-/// the time is up the evening says good night and the app closes itself.
+/// the time is up the evening says good night and the app closes itself,
+/// even if a parent screen was left open over it (it is closed first). A
+/// parent screen gets the window's normal brightness back. Time in the
+/// background does not count, and a clock moved back gives no extra time.
 class LullabyView extends ConsumerStatefulWidget {
   const LullabyView({super.key, required this.onDone, this.startBlack = false});
 
@@ -37,7 +41,7 @@ class LullabyView extends ConsumerStatefulWidget {
   ConsumerState<LullabyView> createState() => _LullabyViewState();
 }
 
-class _LullabyViewState extends ConsumerState<LullabyView> {
+class _LullabyViewState extends ConsumerState<LullabyView> with HushOnLeave {
   late final Sounds _sounds = ref.read(soundsProvider);
   late final ScreenControl _screen = ref.read(screenProvider);
   late final int _night = nightNumber(_now());
@@ -45,15 +49,32 @@ class _LullabyViewState extends ConsumerState<LullabyView> {
   late LullabyClock _clock = LullabyClock(_now(), ref.read(gameProvider).settings.lullabyMinutes);
   late DateTime _lastTouch = widget.startBlack ? _now().subtract(const Duration(seconds: 50)) : _now();
   Timer? _tick, _say;
+  AppLifecycleListener? _life;
   var _dimmed = false;
   var _ended = false;
+
+  /// When the app went out of sight, and the phone's clock at the last tick.
+  DateTime? _hiddenAt;
+  late DateTime _seen = _now();
 
   DateTime _now() => ref.read(clockProvider)();
 
   @override
   void initState() {
     super.initState();
-    _screen.keepOn(true);
+    _life = AppLifecycleListener(
+      onHide: () => _hiddenAt ??= _now(),
+      onShow: () {
+        final at = _hiddenAt;
+        _hiddenAt = null;
+        if (at == null) return;
+        // A few minutes away are not the lullaby's time (ten minutes or
+        // more, the app starts afresh: app.dart AwayGuard).
+        final gone = _now().difference(at);
+        if (!gone.isNegative && gone < Tonight.keep) _move(gone);
+        _update();
+      },
+    );
     _music();
     if (!widget.startBlack) {
       _say = Timer(const Duration(milliseconds: 900), () {
@@ -67,9 +88,31 @@ class _LullabyViewState extends ConsumerState<LullabyView> {
   void dispose() {
     _tick?.cancel();
     _say?.cancel();
+    _life?.dispose();
     _sounds.release(this);
     if (_dimmed) _screen.dim(false);
     super.dispose();
+  }
+
+  /// A parent screen came over the black screen: the window's brightness
+  /// comes back at once.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!(ModalRoute.isCurrentOf(context) ?? true)) _undim();
+  }
+
+  void _undim() {
+    if (!_dimmed) return;
+    _dimmed = false;
+    _screen.dim(false);
+  }
+
+  /// The lullaby's clock and the last touch move by [d] (time not counted,
+  /// or the phone's clock moved back).
+  void _move(Duration d) {
+    _clock = LullabyClock(_clock.started.add(d), _clock.minutes);
+    _lastTouch = _lastTouch.add(d);
   }
 
   void _music() => _sounds.hold(this, Music.of(_sound, _night), level: _clock.volume(_now()));
@@ -84,18 +127,26 @@ class _LullabyViewState extends ConsumerState<LullabyView> {
   }
 
   void _update() {
-    if (!mounted || _ended) return;
+    if (!mounted || _ended || _hiddenAt != null) return;
     final now = _now();
+    if (now.isBefore(_seen)) _move(now.difference(_seen));
+    _seen = now;
+    final top = _onTop;
     if (_clock.done(now)) {
-      if (!_onTop) return;
       _ended = true;
       _tick?.cancel();
       _sounds.hold(this, null);
+      // A parent screen left open (a child tapped the faint 「×」, a parent
+      // fell asleep) does not keep the lullaby going all night.
+      if (!top) {
+        final mine = ModalRoute.of(context);
+        Navigator.of(context).popUntil((r) => r == mine || r.isFirst);
+      }
       widget.onDone();
       return;
     }
-    if (_onTop) _music();
-    final black = _black >= 1;
+    if (top) _music();
+    final black = top && _black >= 1;
     if (black != _dimmed) {
       _dimmed = black;
       _screen.dim(black);
@@ -293,23 +344,27 @@ class _ClosingViewState extends ConsumerState<ClosingView> {
         _sounds.play('goodnight');
       }),
     );
+    // 「換你去睡了」, then the app closes (not before the line has been said).
     _timers.add(
       Timer(const Duration(milliseconds: 1800), () {
-        if (mounted) speak(ref, Strings.yourTurnToSleep);
-      }),
-    );
-    _timers.add(
-      Timer(ClosingView.stay, () async {
         if (!mounted) return;
-        final router = GoRouter.of(context);
-        await ref.read(screenProvider).close();
-        router.go('/ended');
+        _close = Later(ClosingView.stay - const Duration(milliseconds: 1800), _end, after: speak(ref, Strings.yourTurnToSleep));
       }),
     );
   }
 
+  Later? _close;
+
+  Future<void> _end() async {
+    if (!mounted) return;
+    final router = GoRouter.of(context);
+    await ref.read(screenProvider).close();
+    router.go('/ended');
+  }
+
   @override
   void dispose() {
+    _close?.cancel();
     for (final t in _timers) {
       t.cancel();
     }
@@ -362,22 +417,33 @@ class _LullabyOnlyScreenState extends ConsumerState<LullabyOnlyScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.black,
-    body: KidScale(
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 1400),
-              layoutBuilder: fillSwitcher,
-              child: _ended ? const ClosingView() : LullabyView(key: const ValueKey('only'), startBlack: true, onDone: () => setState(() => _ended = true)),
+  Widget build(BuildContext context) {
+    // Back after ten minutes or more away (app.dart AwayGuard): the lullaby
+    // starts afresh, as if the app were opened again.
+    ref.listen(eveningProvider.select((e) => e.run), (_, _) => setState(() => _ended = false));
+    final run = ref.watch(eveningProvider.select((e) => e.run));
+    // The screen stays awake while this is on top; the back key does nothing.
+    return AwakeOnTop(
+      child: BackTo(
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: KidScale(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 1400),
+                    layoutBuilder: fillSwitcher,
+                    child: _ended ? const ClosingView() : LullabyView(key: ValueKey('only-$run'), startBlack: true, onDone: () => setState(() => _ended = true)),
+                  ),
+                ),
+                const Positioned.fill(child: DimLayer()),
+                const ParentCorner(faint: true),
+              ],
             ),
           ),
-          const Positioned.fill(child: DimLayer()),
-          const ParentCorner(faint: true),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

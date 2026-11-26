@@ -23,10 +23,13 @@ class ChecklistView extends ConsumerStatefulWidget {
   ConsumerState<ChecklistView> createState() => _ChecklistViewState();
 }
 
-class _ChecklistViewState extends ConsumerState<ChecklistView> {
+class _ChecklistViewState extends ConsumerState<ChecklistView> with HushOnLeave {
   late final Sounds _sounds = ref.read(soundsProvider);
   final _done = <Check>{};
   final _timers = <Timer>[];
+
+  /// Waits for a last line to be said before going on.
+  final _waits = <Later>[];
 
   @override
   void initState() {
@@ -40,6 +43,9 @@ class _ChecklistViewState extends ConsumerState<ChecklistView> {
     for (final t in _timers) {
       t.cancel();
     }
+    for (final w in _waits) {
+      w.cancel();
+    }
     _sounds.release(this);
     super.dispose();
   }
@@ -48,14 +54,18 @@ class _ChecklistViewState extends ConsumerState<ChecklistView> {
         if (mounted) f();
       }));
 
+  void _finish() {
+    if (mounted) widget.onDone();
+  }
+
   void _tap(Check c) {
     if (_done.contains(c)) return;
     setState(() => _done.add(c));
     _sounds.play('yawn_small');
     speak(ref, Strings.checkDone(c));
     if (_done.length == Check.values.length) {
-      _later(const Duration(milliseconds: 1800), () => speak(ref, Strings.checklistAll));
-      _later(const Duration(milliseconds: 6000), widget.onDone);
+      // On to the town once 「都做好了」 has been said.
+      _later(const Duration(milliseconds: 1800), () => _waits.add(Later(const Duration(milliseconds: 4200), _finish, after: speak(ref, Strings.checklistAll))));
     }
   }
 

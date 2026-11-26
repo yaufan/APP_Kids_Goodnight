@@ -76,6 +76,9 @@ class _DemoVoice implements Voice {
   set slow(bool on) {}
 
   @override
+  set volume(double v) {}
+
+  @override
   Future<void> say(String text) async {}
 
   @override

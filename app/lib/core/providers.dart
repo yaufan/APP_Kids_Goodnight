@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'content.dart';
 import 'evening.dart';
 import 'game.dart';
 import 'screen.dart';
@@ -15,6 +16,10 @@ final savedGameProvider = Provider<Game>((ref) => const Game());
 final soundsProvider = Provider<Sounds>((ref) => const SilentSounds());
 final voiceProvider = Provider<Voice>((ref) => const SilentVoice());
 final screenProvider = Provider<ScreenControl>((ref) => RecordingScreen());
+
+/// Who wants the screen kept awake (the evening, the lullaby) while it is
+/// on top: off as soon as nobody does (a parent screen over it, the end).
+final awakeProvider = Provider<Awake>((ref) => Awake(ref.read(screenProvider)));
 
 /// The settings and the evenings; every change is saved straight away.
 final gameProvider = NotifierProvider<GameNotifier, Game>(GameNotifier.new);
@@ -37,8 +42,16 @@ class GameNotifier extends Notifier<Game> {
 final eveningProvider = NotifierProvider<EveningNotifier, Evening>(EveningNotifier.new);
 
 class EveningNotifier extends Notifier<Evening> {
+  /// The app was closed during tonight's evening and opened again within ten
+  /// minutes: it goes on where it was, the time it was closed not counted.
   @override
-  Evening build() => Evening.start(ref.read(gameProvider).settings, ref.read(clockProvider)());
+  Evening build() {
+    final g = ref.read(gameProvider), now = ref.read(clockProvider)();
+    final fresh = Evening.start(g.settings, now);
+    final t = g.tonight;
+    if (t == null || !t.goesOn(now) || t.index >= fresh.plan.length || fresh.plan[t.index] == Segment.lullaby) return fresh;
+    return Evening(plan: fresh.plan, started: now.subtract(t.used), index: t.index);
+  }
 
   void set(Evening e) => state = e;
 

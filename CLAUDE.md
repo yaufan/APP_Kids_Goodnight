@@ -58,7 +58,7 @@
 ## 程式在哪裡
 - `app/lib/core/`：內容的名字（`content.dart`：段落、晚安清單、動物、燈、搖籃曲、年齡的數量）、一晚的順序和計時（`evening.dart`：哪些段落、多久沒碰就往下、家長的分鐘到了接搖籃曲、搖籃曲的時鐘和最後兩分鐘變小聲）、故事的片段和組合（`story.dart`）、設定和紀錄（`game.dart`：一小時的鎖、最近七天、上次的故事、今晚到哪裡 `Tonight`、家長關卡的鎖 `GateLock`）、小街的位置（`street_layout.dart`，`design/art/street.py` 產生，不要手改）、聲音（`sounds.dart`）、語音（`voice.dart`，國語慢速、句子之間停一下）、螢幕（`screen.dart`：保持開著、APP 視窗變暗、自己關掉）、存檔。
 - `app/lib/features/`：`evening/`（一段接一段、慢慢淡入淡出、多久沒碰和時間到）、`checklist/`、`lights/`（小街、窗戶裡的動物）、`sheep/`、`story/`、`breath/`、`lullaby/`（搖籃曲、最後的「換你去睡了」、只要搖籃曲的黑畫面）、`ended/`（關掉以後；iOS 停在這裡）、`parent/`（家長關卡、家長模式）。
-- 螢幕黑著但不睡：`app/android/.../MainActivity.kt` 和 `app/ios/Runner/AppDelegate.swift` 的 `goodnight_town/screen` 通道（視窗旗標，不要權限）。誰要保持亮著由 `core/screen.dart` 的 `Awake` 管：晚上的畫面和只要搖籃曲的畫面在最上面時才亮著（`widgets.dart` 的 `AwakeOnTop`），家長畫面蓋上去就放掉。
+- 螢幕黑著但不睡：`app/android/.../MainActivity.kt` 和 `app/ios/Runner/AppDelegate.swift` 的 `goodnight_town/screen` 通道（視窗旗標，不要權限）。誰要保持亮著由 `core/screen.dart` 的 `Awake` 管：晚上的畫面和只要搖籃曲的畫面在的時候亮著（`widgets.dart` 的 `KeepAwake`，家長畫面蓋著也一樣，因為它們五分鐘就自己關掉），晚上結束（`/ended`、APP 關掉）就放掉。
 - 家長畫面：`parent_gate.dart` 的 `ParentIdle`（五分鐘沒碰或到背景就關掉，打開時 `speak` 不說話）、`GateLock`（`game.dart`，答錯三次鎖 1／5／15 分鐘）。`app.dart` 的 `AwayGuard`：背景十分鐘以上回來就像重新打開。返回鍵：`widgets.dart` 的 `BackTo`。
 - 語音：`speak`／`readAloud` 回傳念完的 `Future`；`HushOnLeave` 離開只停自己的話；`Later` 等最後一句念完才換下一段。聲音走媒體音量（`sounds.dart` 的 `soundContext`）。
 - 圖：`design/art/`（Python 畫 SVG：`kit.py` 畫法和檢查、`street.py` 小街和每一盞燈、`animals.py`、`sky.py`、`sheep.py`、`story.py`、`icons.py`、`icon.py` APP 圖示；`python3 build.py all` 全部重畫和檢查，`street OUT.png` 預覽小街，`fluttercheck` 用真的 flutter_svg 比對；說明在 `design/art/README.md`）。聲音：`design/sounds/make_sounds.py`（說明在 `README.md`）。
@@ -67,9 +67,9 @@
 ## 目前的狀態（2026-11-26）
 - 0.1.0 已發布（2026-11-15）：Releases 有三個 APK，App 和 Release 都成功；Secrets 加好了。
 - 0.1.1（修正版）做好了、測試都過了，推到工作分支，**還沒發布**（還沒推 `main`，推之前要先問使用者）。修了：
-  - 家長關卡或家長模式沒關時螢幕整晚亮著、搖籃曲播到天亮：家長畫面五分鐘沒碰或到背景就關掉（`ParentIdle`）；家長畫面蓋著時不保持螢幕亮著（`AwakeOnTop`／`Awake`）；搖籃曲時間到了先關掉家長畫面再結束。
+  - 家長關卡或家長模式沒關時螢幕整晚亮著、搖籃曲播到天亮：家長畫面五分鐘沒碰或到背景就關掉（`ParentIdle`），回到晚上的畫面接著走；搖籃曲時間到了先關掉家長畫面再結束；保持亮著改由 `Awake`／`KeepAwake` 照晚上的畫面在不在決定，晚上結束一定放掉。
   - 搖籃曲變黑後家長關卡跟著變暗：家長畫面一出來就恢復亮度。
   - 背景的時間不算（不到十分鐘接著；十分鐘以上像重新打開，`AwayGuard`）；關掉再開十分鐘內接著（`Game.tonight`）；手機時間往回調不會多出時間、不會提早解鎖。
   - 家長模式時故事停、APP 不說話；在家長模式改今晚的段落馬上有用；語音跟著音量；返回鍵不會關掉 APP；家長關卡的鎖 1／5／15 分鐘、存起來；聲音走媒體音量；Android 11+ 找得到語音引擎；換段落不切掉下一段的第一句；搖籃曲畫面提醒不要按電源鍵；關掉 Android 備份；GitHub 檢查多擋聯絡人、相片。
   - 測試在 `app/test/screens_test.dart`（新的）、`rules_test.dart`、`safety_test.dart`。搖籃曲那張截圖多了一行提醒；示範影片沒有重做。
-- 還沒在真手機上試過：螢幕黑著時會不會睡、家長畫面打開時手機會不會照平常關螢幕、Android 自己關掉、窗戶的亮度、聲音的大小和慢速語音、靜音／震動時聽不聽得到，都要用手機確認。
+- 還沒在真手機上試過：螢幕黑著時會不會睡、家長畫面五分鐘自己關掉、搖籃曲時間到了在家長畫面上也會關掉、Android 自己關掉、窗戶的亮度、聲音的大小和慢速語音、靜音／震動時聽不聽得到，都要用手機確認。

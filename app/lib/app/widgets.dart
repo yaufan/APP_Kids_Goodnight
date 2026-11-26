@@ -458,24 +458,27 @@ class BackTo extends StatelessWidget {
       );
 }
 
-/// Keeps the screen awake while [child]'s page is on top (awakeProvider):
-/// a parent screen over it, or the page gone, and the phone may sleep.
-class AwakeOnTop extends ConsumerStatefulWidget {
-  const AwakeOnTop({super.key, required this.child});
+/// Keeps the screen awake while [child] (the evening, only the lullaby) is
+/// there (awakeProvider), parent screens over it included: those close by
+/// themselves after five minutes without a touch, and the lullaby ends on
+/// time even under them, so the evening always reaches its end. Gone (the
+/// end, `/ended`), and the phone may sleep again.
+class KeepAwake extends ConsumerStatefulWidget {
+  const KeepAwake({super.key, required this.child});
 
   final Widget child;
 
   @override
-  ConsumerState<AwakeOnTop> createState() => _AwakeOnTopState();
+  ConsumerState<KeepAwake> createState() => _KeepAwakeState();
 }
 
-class _AwakeOnTopState extends ConsumerState<AwakeOnTop> {
-  late final Awake _awake = ref.read(awakeProvider);
+class _KeepAwakeState extends ConsumerState<KeepAwake> {
+  late final Awake _awake;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _awake.set(this, ModalRoute.isCurrentOf(context) ?? true);
+  void initState() {
+    super.initState();
+    _awake = ref.read(awakeProvider)..set(this, true);
   }
 
   @override

@@ -45,7 +45,7 @@ void main() {
   bool gateOpen() => find.byType(ParentGatePage).evaluate().isNotEmpty;
 
   group('a parent screen left open', () {
-    testWidgets('the gate over the lullaby: the screen may sleep, the brightness comes back, and the lullaby still ends on time', (tester) async {
+    testWidgets('the gate over the lullaby: the brightness comes back, and the lullaby still ends on time', (tester) async {
       final app = await TestApp.start(tester, game: const Game(settings: Settings(lullabyMinutes: 10)));
       await toLullaby(app);
       expect(app.screen.awake, isTrue);
@@ -54,7 +54,7 @@ void main() {
       await app.tapKey('parent-corner', ms: 800);
       expect(gateOpen(), isTrue);
       expect(app.screen.dimmed, isFalse, reason: 'the gate is never dark');
-      expect(app.screen.awake, isFalse, reason: 'the phone may sleep as it always does');
+      expect(app.screen.awake, isTrue, reason: 'the gate closes by itself within five minutes; the lullaby goes on');
       await app.wait(40);
       expect(app.screen.dimmed, isFalse);
       app.now = app.now.add(const Duration(minutes: 10));
@@ -73,7 +73,6 @@ void main() {
       await app.tapKey('parent-corner', ms: 800);
       await app.answerGate();
       expect(app.location, '/parent');
-      expect(app.screen.awake, isFalse);
       app.now = app.now.add(const Duration(minutes: 10));
       await app.wait(15);
       expect(app.screen.closed, 1);

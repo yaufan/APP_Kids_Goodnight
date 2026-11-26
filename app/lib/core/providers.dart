@@ -17,8 +17,8 @@ final soundsProvider = Provider<Sounds>((ref) => const SilentSounds());
 final voiceProvider = Provider<Voice>((ref) => const SilentVoice());
 final screenProvider = Provider<ScreenControl>((ref) => RecordingScreen());
 
-/// Who wants the screen kept awake (the evening, the lullaby) while it is
-/// on top: off as soon as nobody does (a parent screen over it, the end).
+/// Who wants the screen kept awake (the evening, only the lullaby): off as
+/// soon as nobody does (the end).
 final awakeProvider = Provider<Awake>((ref) => Awake(ref.read(screenProvider)));
 
 /// The settings and the evenings; every change is saved straight away.

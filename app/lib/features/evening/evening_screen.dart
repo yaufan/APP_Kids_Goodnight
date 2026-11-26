@@ -20,8 +20,8 @@ import '../story/story_view.dart';
 /// fading from one to the next. Nothing waits forever: a part nobody
 /// touches for a long while quietly gives way to the next, and when the
 /// parent's minutes are up the lullaby comes, wherever the evening is.
-/// The screen is kept awake (by the window, no permission) while the evening
-/// is on top. Time with a parent screen over it or with the app in the
+/// The screen is kept awake (by the window, no permission) through the
+/// evening. Time with a parent screen over it or with the app in the
 /// background does not count (and a parent screen closes by itself after
 /// five idle minutes, so the evening always reaches its end); a clock moved
 /// back gives no extra time; closed and opened again within ten minutes, it
@@ -188,7 +188,7 @@ class _EveningScreenState extends ConsumerState<EveningScreen> {
       null => const ClosingView(),
     };
     // The phone's back key does nothing in the middle of the evening.
-    return AwakeOnTop(child: BackTo(child: Scaffold(
+    return KeepAwake(child: BackTo(child: Scaffold(
       backgroundColor: Night.deep,
       body: KidScale(
         child: Listener(

@@ -43,9 +43,10 @@ class SystemScreen implements ScreenControl {
   }
 }
 
-/// The screen is kept awake while one of its owners (a screen on top) wants
-/// it, and not a moment longer: covered by a parent screen, or the evening
-/// over, the phone sleeps as it always does.
+/// The screen is kept awake while one of its owners (the evening, only the
+/// lullaby) is there, and not a moment longer: the evening over, the phone
+/// sleeps as it always does. Counted by owner, so going from one to the other
+/// never lets it go in between.
 class Awake {
   Awake(this._screen);
 

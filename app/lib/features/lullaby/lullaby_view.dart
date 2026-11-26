@@ -422,8 +422,8 @@ class _LullabyOnlyScreenState extends ConsumerState<LullabyOnlyScreen> {
     // starts afresh, as if the app were opened again.
     ref.listen(eveningProvider.select((e) => e.run), (_, _) => setState(() => _ended = false));
     final run = ref.watch(eveningProvider.select((e) => e.run));
-    // The screen stays awake while this is on top; the back key does nothing.
-    return AwakeOnTop(
+    // The screen stays awake while this is here; the back key does nothing.
+    return KeepAwake(
       child: BackTo(
         child: Scaffold(
           backgroundColor: Colors.black,
